@@ -1,29 +1,369 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { scanScorecard } from "@/lib/scan-scorecard.functions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
+import { Camera, Plus, Loader2, Flag } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Fairway — Golf Scorecard" },
+      { name: "description", content: "Track your golf rounds and auto-fill scores by snapping a photo of your scorecard." },
+      { property: "og:title", content: "Fairway — Golf Scorecard" },
+      { property: "og:description", content: "Track your golf rounds and auto-fill scores by snapping a photo of your scorecard." },
     ],
   }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
+type Round = {
+  id: string;
+  holes: 9 | 18;
+  courseName: string;
+  startedAt: number;
+  pars: (number | null)[];
+  scores: (number | null)[];
+};
+
+const STORAGE_KEY = "fairway.round.v1";
+
+function emptyRound(holes: 9 | 18): Round {
+  return {
+    id: crypto.randomUUID(),
+    holes,
+    courseName: "",
+    startedAt: Date.now(),
+    pars: Array(holes).fill(null),
+    scores: Array(holes).fill(null),
+  };
+}
+
 function Index() {
+  const [round, setRound] = useState<Round | null>(null);
+  const [showNew, setShowNew] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const scan = useServerFn(scanScorecard);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setRound(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  // Persist
+  useEffect(() => {
+    if (round) localStorage.setItem(STORAGE_KEY, JSON.stringify(round));
+  }, [round]);
+
+  const totals = useMemo(() => {
+    if (!round) return { score: 0, par: 0, diff: 0, played: 0 };
+    const score = round.scores.reduce<number>((a, b) => a + (b ?? 0), 0);
+    const par = round.pars.reduce<number>((a, b) => a + (b ?? 0), 0);
+    const played = round.scores.filter((s) => s != null).length;
+    return { score, par, diff: score - par, played };
+  }, [round]);
+
+  function startRound(holes: 9 | 18) {
+    setRound(emptyRound(holes));
+    setShowNew(false);
+  }
+
+  function updateScore(i: number, v: string) {
+    if (!round) return;
+    const n = v === "" ? null : Math.max(1, Math.min(20, parseInt(v, 10) || 0));
+    const next = [...round.scores];
+    next[i] = n;
+    setRound({ ...round, scores: next });
+  }
+  function updatePar(i: number, v: string) {
+    if (!round) return;
+    const n = v === "" ? null : Math.max(3, Math.min(6, parseInt(v, 10) || 0));
+    const next = [...round.pars];
+    next[i] = n;
+    setRound({ ...round, pars: next });
+  }
+
+  async function handleFile(file: File) {
+    if (!round) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Image too large (max 8MB)");
+      return;
+    }
+    setScanning(true);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as string);
+        r.onerror = () => reject(new Error("read failed"));
+        r.readAsDataURL(file);
+      });
+      const result = await scan({ data: { imageDataUrl: dataUrl, holes: round.holes } });
+      setRound({
+        ...round,
+        courseName: result.courseName || round.courseName,
+        pars: result.pars?.map((p, i) => p ?? round.pars[i]) ?? round.pars,
+        scores: result.scores.map((s, i) => s ?? round.scores[i]),
+      });
+      toast.success("Scorecard scanned");
+    } catch (e: any) {
+      toast.error(e?.message || "Scan failed");
+    } finally {
+      setScanning(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="min-h-screen bg-background">
+      <Toaster richColors position="top-center" />
+      <header className="border-b bg-card">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Flag className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-semibold leading-tight">Fairway</h1>
+              <p className="text-xs text-muted-foreground">Golf scorecard tracker</p>
+            </div>
+          </div>
+          <Button onClick={() => setShowNew(true)} size="sm">
+            <Plus className="mr-1 h-4 w-4" /> New round
+          </Button>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-4 py-6">
+        {!round ? (
+          <Card className="flex flex-col items-center justify-center gap-4 p-10 text-center">
+            <Flag className="h-12 w-12 text-muted-foreground" />
+            <div>
+              <h2 className="text-xl font-semibold">No round in progress</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Start a new round to begin tracking your scores.
+              </p>
+            </div>
+            <Button onClick={() => setShowNew(true)}>
+              <Plus className="mr-1 h-4 w-4" /> Start new round
+            </Button>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            <Card className="p-4">
+              <div className="flex flex-wrap items-end gap-4">
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-xs font-medium text-muted-foreground">Course</label>
+                  <Input
+                    value={round.courseName}
+                    onChange={(e) => setRound({ ...round, courseName: e.target.value })}
+                    placeholder="Course name"
+                    className="mt-1"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <Stat label="Holes" value={`${totals.played}/${round.holes}`} />
+                  <Stat label="Score" value={totals.score || "—"} />
+                  <Stat
+                    label="vs Par"
+                    value={totals.par ? (totals.diff > 0 ? `+${totals.diff}` : `${totals.diff}`) : "—"}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                  }}
+                />
+                <Button
+                  variant="default"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={scanning}
+                >
+                  {scanning ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning…
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="mr-2 h-4 w-4" /> Scan scorecard photo
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (confirm("Clear all scores for this round?")) {
+                      setRound({
+                        ...round,
+                        scores: Array(round.holes).fill(null),
+                      });
+                    }
+                  }}
+                >
+                  Clear scores
+                </Button>
+              </div>
+            </Card>
+
+            <ScorecardTable round={round} updateScore={updateScore} updatePar={updatePar} />
+          </div>
+        )}
+      </main>
+
+      <Dialog open={showNew} onOpenChange={setShowNew}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start new round</DialogTitle>
+            <DialogDescription>
+              How many holes are you playing today?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <button
+              onClick={() => startRound(9)}
+              className="rounded-lg border-2 border-border bg-card p-6 text-center transition-colors hover:border-primary hover:bg-accent"
+            >
+              <div className="text-3xl font-bold">9</div>
+              <div className="mt-1 text-sm text-muted-foreground">holes</div>
+            </button>
+            <button
+              onClick={() => startRound(18)}
+              className="rounded-lg border-2 border-border bg-card p-6 text-center transition-colors hover:border-primary hover:bg-accent"
+            >
+              <div className="text-3xl font-bold">18</div>
+              <div className="mt-1 text-sm text-muted-foreground">holes</div>
+            </button>
+          </div>
+          {round && (
+            <DialogFooter>
+              <p className="text-xs text-muted-foreground">
+                Starting a new round will replace your current round.
+              </p>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-md bg-muted px-3 py-2 min-w-[64px]">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-base font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function ScorecardTable({
+  round,
+  updateScore,
+  updatePar,
+}: {
+  round: Round;
+  updateScore: (i: number, v: string) => void;
+  updatePar: (i: number, v: string) => void;
+}) {
+  const groups: number[][] = round.holes === 9 ? [[...Array(9).keys()]] : [[...Array(9).keys()], [...Array(9).keys()].map((i) => i + 9)];
+
+  return (
+    <div className="space-y-4">
+      {groups.map((idxs, gi) => {
+        const parSum = idxs.reduce((a, i) => a + (round.pars[i] ?? 0), 0);
+        const scoreSum = idxs.reduce((a, i) => a + (round.scores[i] ?? 0), 0);
+        const label = round.holes === 9 ? "Holes" : gi === 0 ? "Front 9" : "Back 9";
+        return (
+          <Card key={gi} className="overflow-hidden">
+            <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
+              <h3 className="text-sm font-semibold">{label}</h3>
+              <div className="text-xs text-muted-foreground">
+                Par {parSum || "—"} · Score {scoreSum || "—"}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/30 text-muted-foreground">
+                    <th className="px-3 py-2 text-left text-xs font-medium">Hole</th>
+                    {idxs.map((i) => (
+                      <th key={i} className="px-1 py-2 text-center text-xs font-medium w-12">
+                        {i + 1}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t">
+                    <td className="px-3 py-2 text-xs font-medium text-muted-foreground">Par</td>
+                    {idxs.map((i) => (
+                      <td key={i} className="p-1">
+                        <input
+                          inputMode="numeric"
+                          value={round.pars[i] ?? ""}
+                          onChange={(e) => updatePar(i, e.target.value)}
+                          className="h-9 w-full rounded-sm border border-input bg-background text-center text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                  <tr className="border-t">
+                    <td className="px-3 py-2 text-xs font-medium">Score</td>
+                    {idxs.map((i) => {
+                      const s = round.scores[i];
+                      const p = round.pars[i];
+                      const diff = s != null && p != null ? s - p : null;
+                      const tone =
+                        diff == null
+                          ? ""
+                          : diff < 0
+                          ? "ring-2 ring-emerald-500/60"
+                          : diff === 0
+                          ? ""
+                          : diff === 1
+                          ? "ring-1 ring-amber-500/50"
+                          : "ring-2 ring-rose-500/50";
+                      return (
+                        <td key={i} className="p-1">
+                          <input
+                            inputMode="numeric"
+                            value={s ?? ""}
+                            onChange={(e) => updateScore(i, e.target.value)}
+                            className={`h-10 w-full rounded-sm border border-input bg-background text-center text-base font-semibold tabular-nums focus:outline-none focus:ring-1 focus:ring-ring ${tone}`}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
