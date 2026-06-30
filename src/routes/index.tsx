@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { scanScorecard } from "@/lib/scan-scorecard.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +55,6 @@ function Index() {
   const [showNew, setShowNew] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const scan = useServerFn(scanScorecard);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -113,7 +111,7 @@ function Index() {
         r.onerror = () => reject(new Error("read failed"));
         r.readAsDataURL(file);
       });
-      const result = await scan({ data: { imageDataUrl: dataUrl, holes: round.holes } });
+      const result = await scanScorecard({ data: { imageDataUrl: dataUrl, holes: round.holes } });
       setRound({
         ...round,
         courseName: result.courseName || round.courseName,
