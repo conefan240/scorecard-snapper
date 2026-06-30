@@ -236,6 +236,9 @@ function Index() {
                     </>
                   )}
                 </Button>
+                <Button variant="secondary" onClick={saveRound}>
+                  <Save className="mr-2 h-4 w-4" /> Save round
+                </Button>
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -255,7 +258,66 @@ function Index() {
             <ScorecardTable round={round} updateScore={updateScore} updatePar={updatePar} />
           </div>
         )}
+
+        {saved.length > 0 && (
+          <section className="mt-8">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Saved rounds
+            </h2>
+            <div className="space-y-2">
+              {saved.map((r) => {
+                const score = r.scores.reduce<number>((a, b) => a + (b ?? 0), 0);
+                const par = r.pars.reduce<number>((a, b) => a + (b ?? 0), 0);
+                const diff = score - par;
+                const date = new Date(r.savedAt ?? r.startedAt);
+                const dateStr = date.toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+                return (
+                  <Card
+                    key={r.id}
+                    className="flex items-center justify-between gap-3 p-3 transition-colors hover:bg-accent/40"
+                  >
+                    <button
+                      onClick={() => openSaved(r)}
+                      className="flex flex-1 items-center gap-3 text-left"
+                    >
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">
+                        {r.holes}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">
+                          {r.courseName || "Unnamed course"}
+                        </div>
+                        <div className="text-xs text-muted-foreground">{dateStr}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-base font-semibold tabular-nums">{score || "—"}</div>
+                        <div className="text-xs text-muted-foreground tabular-nums">
+                          {par ? (diff > 0 ? `+${diff}` : diff === 0 ? "E" : `${diff}`) : "—"}
+                        </div>
+                      </div>
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (confirm("Delete this saved round?")) deleteSaved(r.id);
+                      }}
+                      aria-label="Delete round"
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
+
 
       <Dialog open={showNew} onOpenChange={setShowNew}>
         <DialogContent>
