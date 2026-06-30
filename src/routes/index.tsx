@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import { Camera, Plus, Loader2, Flag } from "lucide-react";
+import { Camera, Plus, Loader2, Flag, Save, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -33,11 +33,13 @@ type Round = {
   holes: 9 | 18;
   courseName: string;
   startedAt: number;
+  savedAt?: number;
   pars: (number | null)[];
   scores: (number | null)[];
 };
 
 const STORAGE_KEY = "fairway.round.v1";
+const SAVED_KEY = "fairway.saved.v1";
 
 function emptyRound(holes: 9 | 18): Round {
   return {
@@ -52,6 +54,7 @@ function emptyRound(holes: 9 | 18): Round {
 
 function Index() {
   const [round, setRound] = useState<Round | null>(null);
+  const [saved, setSaved] = useState<Round[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -61,13 +64,36 @@ function Index() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) setRound(JSON.parse(raw));
+      const savedRaw = localStorage.getItem(SAVED_KEY);
+      if (savedRaw) setSaved(JSON.parse(savedRaw));
     } catch {}
   }, []);
 
   // Persist
   useEffect(() => {
     if (round) localStorage.setItem(STORAGE_KEY, JSON.stringify(round));
+    else localStorage.removeItem(STORAGE_KEY);
   }, [round]);
+
+  useEffect(() => {
+    localStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+  }, [saved]);
+
+  function saveRound() {
+    if (!round) return;
+    const toSave: Round = { ...round, savedAt: Date.now() };
+    setSaved((prev) => [toSave, ...prev.filter((r) => r.id !== toSave.id)]);
+    setRound(null);
+    toast.success("Round saved");
+  }
+
+  function deleteSaved(id: string) {
+    setSaved((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  function openSaved(r: Round) {
+    setRound(r);
+  }
 
   const totals = useMemo(() => {
     if (!round) return { score: 0, par: 0, diff: 0, played: 0 };
