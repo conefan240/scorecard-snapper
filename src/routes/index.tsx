@@ -168,6 +168,7 @@ function Index() {
     } finally {
       setScanning(false);
       if (fileRef.current) fileRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
     }
   }
 
