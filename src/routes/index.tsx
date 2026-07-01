@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import { Camera, Plus, Loader2, Flag, Save, Trash2 } from "lucide-react";
+import { Camera, Plus, Loader2, Flag, Save, Trash2, Upload, Moon, Sun } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -58,6 +58,24 @@ function Index() {
   const [showNew, setShowNew] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const [dark, setDark] = useState(false);
+
+  // Init dark mode from storage / system
+  useEffect(() => {
+    const stored = localStorage.getItem("fairway.theme");
+    const prefers = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+    const enable = stored ? stored === "dark" : !!prefers;
+    setDark(enable);
+    document.documentElement.classList.toggle("dark", enable);
+  }, []);
+
+  function toggleDark() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("fairway.theme", next ? "dark" : "light");
+  }
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -150,6 +168,7 @@ function Index() {
     } finally {
       setScanning(false);
       if (fileRef.current) fileRef.current.value = "";
+      if (cameraRef.current) cameraRef.current.value = "";
     }
   }
 
@@ -167,9 +186,19 @@ function Index() {
               <p className="text-xs text-muted-foreground">Golf scorecard tracker</p>
             </div>
           </div>
-          <Button onClick={() => setShowNew(true)} size="sm">
-            <Plus className="mr-1 h-4 w-4" /> New round
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleDark}
+              aria-label="Toggle dark mode"
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button onClick={() => setShowNew(true)} size="sm">
+              <Plus className="mr-1 h-4 w-4" /> New round
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -214,6 +243,16 @@ function Index() {
                   ref={fileRef}
                   type="file"
                   accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                  }}
+                />
+                <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
                   capture="environment"
                   className="hidden"
                   onChange={(e) => {
@@ -223,7 +262,7 @@ function Index() {
                 />
                 <Button
                   variant="default"
-                  onClick={() => fileRef.current?.click()}
+                  onClick={() => cameraRef.current?.click()}
                   disabled={scanning}
                 >
                   {scanning ? (
@@ -232,9 +271,16 @@ function Index() {
                     </>
                   ) : (
                     <>
-                      <Camera className="mr-2 h-4 w-4" /> Scan scorecard photo
+                      <Camera className="mr-2 h-4 w-4" /> Take photo
                     </>
                   )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={scanning}
+                >
+                  <Upload className="mr-2 h-4 w-4" /> Upload image
                 </Button>
                 <Button variant="secondary" onClick={saveRound}>
                   <Save className="mr-2 h-4 w-4" /> Save round
