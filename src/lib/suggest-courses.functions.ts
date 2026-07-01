@@ -65,7 +65,7 @@ Only include real courses you actually know. If none match, return {"suggestions
       for (let i = 0; i < data.holes; i++) {
         const v = Array.isArray(s?.pars) ? s.pars[i] : null;
         const n = typeof v === "number" ? v : v == null ? null : Number(v);
-        pars.push(Number.isFinite(n) && n >= 3 && n <= 6 ? (n as number) : null);
+        pars.push(n != null && Number.isFinite(n) && n >= 3 && n <= 6 ? (n as number) : null);
       }
       return {
         name: String(s?.name ?? "").slice(0, 120),
