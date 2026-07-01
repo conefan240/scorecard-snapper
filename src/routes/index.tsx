@@ -243,6 +243,16 @@ function Index() {
                   ref={fileRef}
                   type="file"
                   accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFile(f);
+                  }}
+                />
+                <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
                   capture="environment"
                   className="hidden"
                   onChange={(e) => {
@@ -252,7 +262,7 @@ function Index() {
                 />
                 <Button
                   variant="default"
-                  onClick={() => fileRef.current?.click()}
+                  onClick={() => cameraRef.current?.click()}
                   disabled={scanning}
                 >
                   {scanning ? (
@@ -261,9 +271,16 @@ function Index() {
                     </>
                   ) : (
                     <>
-                      <Camera className="mr-2 h-4 w-4" /> Scan scorecard photo
+                      <Camera className="mr-2 h-4 w-4" /> Take photo
                     </>
                   )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={scanning}
+                >
+                  <Upload className="mr-2 h-4 w-4" /> Upload image
                 </Button>
                 <Button variant="secondary" onClick={saveRound}>
                   <Save className="mr-2 h-4 w-4" /> Save round
