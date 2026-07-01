@@ -186,9 +186,19 @@ function Index() {
               <p className="text-xs text-muted-foreground">Golf scorecard tracker</p>
             </div>
           </div>
-          <Button onClick={() => setShowNew(true)} size="sm">
-            <Plus className="mr-1 h-4 w-4" /> New round
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleDark}
+              aria-label="Toggle dark mode"
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+            <Button onClick={() => setShowNew(true)} size="sm">
+              <Plus className="mr-1 h-4 w-4" /> New round
+            </Button>
+          </div>
         </div>
       </header>
 
