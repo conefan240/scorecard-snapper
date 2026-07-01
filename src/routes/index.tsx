@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
-import { Camera, Plus, Loader2, Flag, Save, Trash2 } from "lucide-react";
+import { Camera, Plus, Loader2, Flag, Save, Trash2, Upload, Moon, Sun } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
