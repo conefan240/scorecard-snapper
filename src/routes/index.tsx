@@ -58,6 +58,24 @@ function Index() {
   const [showNew, setShowNew] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const [dark, setDark] = useState(false);
+
+  // Init dark mode from storage / system
+  useEffect(() => {
+    const stored = localStorage.getItem("fairway.theme");
+    const prefers = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+    const enable = stored ? stored === "dark" : !!prefers;
+    setDark(enable);
+    document.documentElement.classList.toggle("dark", enable);
+  }, []);
+
+  function toggleDark() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("fairway.theme", next ? "dark" : "light");
+  }
 
   // Load from localStorage on mount
   useEffect(() => {
