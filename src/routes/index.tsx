@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanScorecard } from "@/lib/scan-scorecard.functions";
+import { suggestCourses, type CourseSuggestion } from "@/lib/suggest-courses.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
