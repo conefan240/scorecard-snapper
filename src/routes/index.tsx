@@ -122,8 +122,11 @@ function Index() {
     return { score, par, diff: score - par, played };
   }, [round]);
 
-  function startRound(holes: 9 | 18) {
-    setRound(emptyRound(holes));
+  function startRound(holes: 9 | 18, courseName = "", pars?: (number | null)[]) {
+    const r = emptyRound(holes);
+    r.courseName = courseName;
+    if (pars && pars.length === holes) r.pars = pars.slice();
+    setRound(r);
     setShowNew(false);
   }
 
