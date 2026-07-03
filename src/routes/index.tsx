@@ -134,8 +134,9 @@ function Index() {
   }
 
   function openSaved(r: Round) {
-    setRound(r);
+    setRound({ ...r, entryMode: r.entryMode ?? "manual" });
   }
+
 
   const totals = useMemo(() => {
     if (!round) return { score: 0, par: 0, diff: 0, played: 0 };
