@@ -105,7 +105,13 @@ function Index() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setRound(JSON.parse(raw));
+      if (raw) {
+        const parsed: Round = JSON.parse(raw);
+        // Legacy rounds (pre-scan-first flow) had no entryMode; keep them in the grid.
+        if (!("entryMode" in parsed)) parsed.entryMode = "manual";
+        setRound(parsed);
+      }
+
       const savedRaw = localStorage.getItem(SAVED_KEY);
       if (savedRaw) setSaved(JSON.parse(savedRaw));
     } catch {}
