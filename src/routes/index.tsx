@@ -58,9 +58,11 @@ function Index() {
   const [saved, setSaved] = useState<Round[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanPromptForId, setScanPromptForId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [dark, setDark] = useState(false);
+  const showScanPrompt = !!round && scanPromptForId === round.id;
 
   // Init dark mode from storage / system
   useEffect(() => {
@@ -112,6 +114,7 @@ function Index() {
 
   function openSaved(r: Round) {
     setRound(r);
+    setScanPromptForId(null);
   }
 
   const totals = useMemo(() => {
@@ -127,6 +130,7 @@ function Index() {
     r.courseName = courseName;
     if (pars && pars.length === holes) r.pars = pars.slice();
     setRound(r);
+    setScanPromptForId(r.id);
     setShowNew(false);
   }
 
@@ -166,6 +170,7 @@ function Index() {
         pars: result.pars?.map((p, i) => p ?? round.pars[i]) ?? round.pars,
         scores: result.scores.map((s, i) => s ?? round.scores[i]),
       });
+      setScanPromptForId(null);
       toast.success("Scorecard scanned");
     } catch (e: any) {
       toast.error(e?.message || "Scan failed");
@@ -222,90 +227,133 @@ function Index() {
           </Card>
         ) : (
           <div className="space-y-4">
-            <Card className="p-4">
-              <div className="flex flex-wrap items-end gap-4">
-                <div className="flex-1 min-w-[180px]">
-                  <label className="text-xs font-medium text-muted-foreground">Course</label>
-                  <Input
-                    value={round.courseName}
-                    onChange={(e) => setRound({ ...round, courseName: e.target.value })}
-                    placeholder="Course name"
-                    className="mt-1"
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <Stat label="Holes" value={`${totals.played}/${round.holes}`} />
-                  <Stat label="Score" value={totals.score || "—"} />
-                  <Stat
-                    label="vs Par"
-                    value={totals.par ? (totals.diff > 0 ? `+${totals.diff}` : `${totals.diff}`) : "—"}
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
-                <input
-                  ref={cameraRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
-                <Button
-                  variant="default"
-                  onClick={() => cameraRef.current?.click()}
-                  disabled={scanning}
-                >
-                  {scanning ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning…
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="mr-2 h-4 w-4" /> Take photo
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={scanning}
-                >
-                  <Upload className="mr-2 h-4 w-4" /> Upload image
-                </Button>
-                <Button variant="secondary" onClick={saveRound}>
-                  <Save className="mr-2 h-4 w-4" /> Save round
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (confirm("Clear all scores for this round?")) {
-                      setRound({
-                        ...round,
-                        scores: Array(round.holes).fill(null),
-                      });
-                    }
-                  }}
-                >
-                  Clear scores
-                </Button>
-              </div>
-            </Card>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+              }}
+            />
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+              }}
+            />
 
-            <ScorecardTable round={round} updateScore={updateScore} updatePar={updatePar} />
+            {showScanPrompt ? (
+              <Card className="flex flex-col items-center gap-5 p-8 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Camera className="h-7 w-7" />
+                </div>
+                <div className="space-y-1">
+                  <h2 className="text-xl font-semibold">Scan your scorecard</h2>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    {round.courseName ? <>Playing <span className="font-medium text-foreground">{round.courseName}</span>. </> : null}
+                    Snap a photo of your paper card when the round's done — we'll fill in every hole for you.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <Button
+                    size="lg"
+                    onClick={() => cameraRef.current?.click()}
+                    disabled={scanning}
+                  >
+                    {scanning ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning…</>
+                    ) : (
+                      <><Camera className="mr-2 h-4 w-4" /> Take photo</>
+                    )}
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={scanning}
+                  >
+                    <Upload className="mr-2 h-4 w-4" /> Upload image
+                  </Button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScanPromptForId(null)}
+                  disabled={scanning}
+                  className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground disabled:opacity-50"
+                >
+                  Enter manually instead
+                </button>
+              </Card>
+            ) : (
+              <>
+                <Card className="p-4">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="text-xs font-medium text-muted-foreground">Course</label>
+                      <Input
+                        value={round.courseName}
+                        onChange={(e) => setRound({ ...round, courseName: e.target.value })}
+                        placeholder="Course name"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <Stat label="Holes" value={`${totals.played}/${round.holes}`} />
+                      <Stat label="Score" value={totals.score || "—"} />
+                      <Stat
+                        label="vs Par"
+                        value={totals.par ? (totals.diff > 0 ? `+${totals.diff}` : `${totals.diff}`) : "—"}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="default"
+                      onClick={() => cameraRef.current?.click()}
+                      disabled={scanning}
+                    >
+                      {scanning ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning…</>
+                      ) : (
+                        <><Camera className="mr-2 h-4 w-4" /> Take photo</>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={scanning}
+                    >
+                      <Upload className="mr-2 h-4 w-4" /> Upload image
+                    </Button>
+                    <Button variant="secondary" onClick={saveRound}>
+                      <Save className="mr-2 h-4 w-4" /> Save round
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (confirm("Clear all scores for this round?")) {
+                          setRound({
+                            ...round,
+                            scores: Array(round.holes).fill(null),
+                          });
+                        }
+                      }}
+                    >
+                      Clear scores
+                    </Button>
+                  </div>
+                </Card>
+
+                <ScorecardTable round={round} updateScore={updateScore} updatePar={updatePar} />
+              </>
+            )}
           </div>
         )}
 
