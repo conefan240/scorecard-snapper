@@ -37,10 +37,12 @@ type Round = {
   savedAt?: number;
   pars: (number | null)[];
   scores: (number | null)[];
+  entryMode?: "scan" | "manual" | null;
 };
 
 const STORAGE_KEY = "fairway.round.v1";
 const SAVED_KEY = "fairway.saved.v1";
+const NUDGE_KEY = "fairway.nudge.dismissed";
 
 function emptyRound(holes: 9 | 18): Round {
   return {
