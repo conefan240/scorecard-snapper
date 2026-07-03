@@ -127,10 +127,12 @@ function Index() {
   function startRound(holes: 9 | 18, courseName = "", pars?: (number | null)[]) {
     const r = emptyRound(holes);
     r.courseName = courseName;
+    r.entryMode = null;
     if (pars && pars.length === holes) r.pars = pars.slice();
     setRound(r);
     setShowNew(false);
   }
+
 
   function updateScore(i: number, v: string) {
     if (!round) return;
