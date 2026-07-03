@@ -114,6 +114,7 @@ function Index() {
 
   function openSaved(r: Round) {
     setRound(r);
+    setScanPromptForId(null);
   }
 
   const totals = useMemo(() => {
