@@ -37,10 +37,12 @@ type Round = {
   savedAt?: number;
   pars: (number | null)[];
   scores: (number | null)[];
+  entryMode?: "scan" | "manual" | null;
 };
 
 const STORAGE_KEY = "fairway.round.v1";
 const SAVED_KEY = "fairway.saved.v1";
+const NUDGE_KEY = "fairway.nudge.dismissed";
 
 function emptyRound(holes: 9 | 18): Round {
   return {
@@ -61,6 +63,27 @@ function Index() {
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [dark, setDark] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    setNudgeDismissed(localStorage.getItem(NUDGE_KEY) === today);
+  }, []);
+
+  function dismissNudge() {
+    localStorage.setItem(NUDGE_KEY, new Date().toDateString());
+    setNudgeDismissed(true);
+  }
+
+  const showNudge = (() => {
+    if (!round || nudgeDismissed) return false;
+    const started = new Date(round.startedAt);
+    const sameDay = started.toDateString() === new Date().toDateString();
+    const hasScores = round.scores.some((s) => s != null);
+    const hoursSince = (Date.now() - round.startedAt) / 3_600_000;
+    return sameDay && hasScores && hoursSince >= 3;
+  })();
+
 
   // Init dark mode from storage / system
   useEffect(() => {
@@ -82,7 +105,13 @@ function Index() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setRound(JSON.parse(raw));
+      if (raw) {
+        const parsed: Round = JSON.parse(raw);
+        // Legacy rounds (pre-scan-first flow) had no entryMode; keep them in the grid.
+        if (!("entryMode" in parsed)) parsed.entryMode = "manual";
+        setRound(parsed);
+      }
+
       const savedRaw = localStorage.getItem(SAVED_KEY);
       if (savedRaw) setSaved(JSON.parse(savedRaw));
     } catch {}
@@ -111,8 +140,9 @@ function Index() {
   }
 
   function openSaved(r: Round) {
-    setRound(r);
+    setRound({ ...r, entryMode: r.entryMode ?? "manual" });
   }
+
 
   const totals = useMemo(() => {
     if (!round) return { score: 0, par: 0, diff: 0, played: 0 };
@@ -125,10 +155,12 @@ function Index() {
   function startRound(holes: 9 | 18, courseName = "", pars?: (number | null)[]) {
     const r = emptyRound(holes);
     r.courseName = courseName;
+    r.entryMode = null;
     if (pars && pars.length === holes) r.pars = pars.slice();
     setRound(r);
     setShowNew(false);
   }
+
 
   function updateScore(i: number, v: string) {
     if (!round) return;
@@ -162,11 +194,13 @@ function Index() {
       const result = await scanScorecard({ data: { imageDataUrl: dataUrl, holes: round.holes } });
       setRound({
         ...round,
+        entryMode: "scan",
         courseName: result.courseName || round.courseName,
         pars: result.pars?.map((p, i) => p ?? round.pars[i]) ?? round.pars,
         scores: result.scores.map((s, i) => s ?? round.scores[i]),
       });
       toast.success("Scorecard scanned");
+
     } catch (e: any) {
       toast.error(e?.message || "Scan failed");
     } finally {
@@ -207,6 +241,42 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile(f);
+          }}
+        />
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleFile(f);
+          }}
+        />
+
+        {showNudge && (
+          <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+            <div className="flex-1">
+              <div className="font-medium">Wrap up today's round?</div>
+              <p className="text-xs text-muted-foreground">
+                Snap your card now so it doesn't slip your mind — takes a second.
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={dismissNudge}>
+              Later
+            </Button>
+          </div>
+        )}
+
         {!round ? (
           <Card className="flex flex-col items-center justify-center gap-4 p-10 text-center">
             <Flag className="h-12 w-12 text-muted-foreground" />
@@ -219,6 +289,45 @@ function Index() {
             <Button onClick={() => setShowNew(true)}>
               <Plus className="mr-1 h-4 w-4" /> Start new round
             </Button>
+          </Card>
+        ) : round.entryMode == null ? (
+          <Card className="flex flex-col items-center gap-5 p-8 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Camera className="h-7 w-7" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Scan your scorecard</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {round.courseName ? `${round.courseName} · ` : ""}{round.holes} holes.
+                Snap the paper card and we'll fill in your scores.
+              </p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button onClick={() => cameraRef.current?.click()} disabled={scanning}>
+                {scanning ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning…</>
+                ) : (
+                  <><Camera className="mr-2 h-4 w-4" /> Take photo</>
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={scanning}>
+                <Upload className="mr-2 h-4 w-4" /> Upload image
+              </Button>
+            </div>
+            <button
+              onClick={() => setRound({ ...round, entryMode: "manual" })}
+              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+            >
+              Enter manually instead
+            </button>
+            <button
+              onClick={() => {
+                if (confirm("Cancel this round?")) setRound(null);
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel round
+            </button>
           </Card>
         ) : (
           <div className="space-y-4">
@@ -243,40 +352,15 @@ function Index() {
                 </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
-                <input
-                  ref={cameraRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
                 <Button
-                  variant="default"
+                  variant="outline"
                   onClick={() => cameraRef.current?.click()}
                   disabled={scanning}
                 >
                   {scanning ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning…
-                    </>
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning…</>
                   ) : (
-                    <>
-                      <Camera className="mr-2 h-4 w-4" /> Take photo
-                    </>
+                    <><Camera className="mr-2 h-4 w-4" /> Rescan</>
                   )}
                 </Button>
                 <Button
@@ -284,13 +368,13 @@ function Index() {
                   onClick={() => fileRef.current?.click()}
                   disabled={scanning}
                 >
-                  <Upload className="mr-2 h-4 w-4" /> Upload image
+                  <Upload className="mr-2 h-4 w-4" /> Upload
                 </Button>
                 <Button variant="secondary" onClick={saveRound}>
                   <Save className="mr-2 h-4 w-4" /> Save round
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => {
                     if (confirm("Clear all scores for this round?")) {
                       setRound({
@@ -308,6 +392,7 @@ function Index() {
             <ScorecardTable round={round} updateScore={updateScore} updatePar={updatePar} />
           </div>
         )}
+
 
         {saved.length > 0 && (
           <section className="mt-8">
