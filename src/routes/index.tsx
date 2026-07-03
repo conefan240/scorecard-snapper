@@ -130,6 +130,7 @@ function Index() {
     r.courseName = courseName;
     if (pars && pars.length === holes) r.pars = pars.slice();
     setRound(r);
+    setScanPromptForId(r.id);
     setShowNew(false);
   }
 
