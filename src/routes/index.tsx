@@ -166,11 +166,13 @@ function Index() {
       const result = await scanScorecard({ data: { imageDataUrl: dataUrl, holes: round.holes } });
       setRound({
         ...round,
+        entryMode: "scan",
         courseName: result.courseName || round.courseName,
         pars: result.pars?.map((p, i) => p ?? round.pars[i]) ?? round.pars,
         scores: result.scores.map((s, i) => s ?? round.scores[i]),
       });
       toast.success("Scorecard scanned");
+
     } catch (e: any) {
       toast.error(e?.message || "Scan failed");
     } finally {
