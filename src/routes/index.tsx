@@ -170,6 +170,7 @@ function Index() {
         pars: result.pars?.map((p, i) => p ?? round.pars[i]) ?? round.pars,
         scores: result.scores.map((s, i) => s ?? round.scores[i]),
       });
+      setScanPromptForId(null);
       toast.success("Scorecard scanned");
     } catch (e: any) {
       toast.error(e?.message || "Scan failed");
