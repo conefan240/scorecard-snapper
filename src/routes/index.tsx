@@ -58,9 +58,11 @@ function Index() {
   const [saved, setSaved] = useState<Round[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanPromptForId, setScanPromptForId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [dark, setDark] = useState(false);
+  const showScanPrompt = !!round && scanPromptForId === round.id;
 
   // Init dark mode from storage / system
   useEffect(() => {
