@@ -63,6 +63,27 @@ function Index() {
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [dark, setDark] = useState(false);
+  const [nudgeDismissed, setNudgeDismissed] = useState(false);
+
+  useEffect(() => {
+    const today = new Date().toDateString();
+    setNudgeDismissed(localStorage.getItem(NUDGE_KEY) === today);
+  }, []);
+
+  function dismissNudge() {
+    localStorage.setItem(NUDGE_KEY, new Date().toDateString());
+    setNudgeDismissed(true);
+  }
+
+  const showNudge = (() => {
+    if (!round || nudgeDismissed) return false;
+    const started = new Date(round.startedAt);
+    const sameDay = started.toDateString() === new Date().toDateString();
+    const hasScores = round.scores.some((s) => s != null);
+    const hoursSince = (Date.now() - round.startedAt) / 3_600_000;
+    return sameDay && hasScores && hoursSince >= 3;
+  })();
+
 
   // Init dark mode from storage / system
   useEffect(() => {
